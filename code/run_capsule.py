@@ -336,83 +336,83 @@ if __name__ == "__main__":
                             except:
                                 logging.info(f"\t\tNo LFP stream found for {exp_stream_name}")
 
-elif INPUT == "spikeglx":
-    # get blocks/experiments and streams info
-    spikeglx_folders = [p for p in data_folder.iterdir() if p.is_dir()]
-    if len(spikeglx_folders) == 0:
-        raise Exception("No valid SpikeGLX folder found.")
-    elif len(spikeglx_folders) > 1 and not MULTI_SESSION:
-        raise Exception("Multiple SpikeGLX sessions found in the data folder. Please only add one at a time")
-
-    for spikeglx_folder in spikeglx_folders:
-        session_name = spikeglx_folder.name
-        stream_names, stream_ids = se.get_neo_streams("spikeglx", spikeglx_folder)
-
-        # spikeglx has only one block
-        num_blocks = 1
-        block_index = 0
-
-        logging.info(f"\tSession name: {session_name}")
-        logging.info(f"\tNum. streams: {len(stream_names)}")
-        logging.info(f"\tStreams detected: {stream_names}")
-
-        added_any = False
-        for stream_name in stream_names:
-            # allow NIDQ; still skip LF and SYNC helper streams
-            if ("lf" in stream_name) or ("SYNC" in stream_name):
-                logging.info(f"\tSkipping stream {stream_name} (LF/SYNC)")
-                continue
-
-            try:
-                recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
-
-                # OPTIONAL: for NIDQ, keep only MN channels (drop MA) to avoid gain mismatch
-                # Your meta says snsMnMaXaDw=32,4,0,0 → the first 32 saved channels are MN
-                if stream_name == "nidq":
+    elif INPUT == "spikeglx":
+        # get blocks/experiments and streams info
+        spikeglx_folders = [p for p in data_folder.iterdir() if p.is_dir()]
+        if len(spikeglx_folders) == 0:
+            raise Exception("No valid SpikeGLX folder found.")
+        elif len(spikeglx_folders) > 1 and not MULTI_SESSION:
+            raise Exception("Multiple SpikeGLX sessions found in the data folder. Please only add one at a time")
+    
+        for spikeglx_folder in spikeglx_folders:
+            session_name = spikeglx_folder.name
+            stream_names, stream_ids = se.get_neo_streams("spikeglx", spikeglx_folder)
+    
+            # spikeglx has only one block
+            num_blocks = 1
+            block_index = 0
+    
+            logging.info(f"\tSession name: {session_name}")
+            logging.info(f"\tNum. streams: {len(stream_names)}")
+            logging.info(f"\tStreams detected: {stream_names}")
+    
+            added_any = False
+            for stream_name in stream_names:
+                # allow NIDQ; still skip LF and SYNC helper streams
+                if ("lf" in stream_name) or ("SYNC" in stream_name):
+                    logging.info(f"\tSkipping stream {stream_name} (LF/SYNC)")
+                    continue
+    
+                try:
+                    recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
+    
+                    # OPTIONAL: for NIDQ, keep only MN channels (drop MA) to avoid gain mismatch
+                    # Your meta says snsMnMaXaDw=32,4,0,0 → the first 32 saved channels are MN
+                    if stream_name == "nidq":
+                        try:
+                            if recording.get_num_channels() >= 36:
+                                recording = recording.channel_slice(channel_ids=recording.channel_ids[:32])
+                                logging.info("\tNIDQ: keeping first 32 MN channels (dropping MA)")
+                        except Exception as e:
+                            logging.info(f"\tNIDQ channel slice skipped (non-fatal): {e}")
+    
+                    recording_name = f"block{block_index}_{stream_name}_recording"
+                    recording_dict[(session_name, recording_name)] = {}
+                    recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
+                    recording_dict[(session_name, recording_name)]["raw"] = recording
+                    added_any = True
+    
+                    # load the associated LF stream (if available) only for AP streams
+                    if "ap" in stream_name:
+                        stream_name_lf = stream_name.replace("ap", "lf")
+                        try:
+                            recording_lf = se.read_spikeglx(spikeglx_folder, stream_name=stream_name_lf)
+                            recording_dict[(session_name, recording_name)]["lfp"] = recording_lf
+                        except Exception:
+                            logging.info(f"\t\tNo LFP stream found for {stream_name}")
+    
+                except Exception as e:
+                    logging.info(f"\tFailed to read stream {stream_name}: {e}")
+    
+            # Fallback: if nothing was added (e.g., only LF detected), try to read 'nidq' explicitly
+            if not added_any:
+                try:
+                    logging.info("\tNo eligible streams added; trying explicit 'nidq' fallback")
+                    recording = se.read_spikeglx(spikeglx_folder, stream_name="nidq")
                     try:
                         if recording.get_num_channels() >= 36:
                             recording = recording.channel_slice(channel_ids=recording.channel_ids[:32])
-                            logging.info("\tNIDQ: keeping first 32 MN channels (dropping MA)")
+                            logging.info("\tNIDQ fallback: keeping first 32 MN channels (dropping MA)")
                     except Exception as e:
-                        logging.info(f"\tNIDQ channel slice skipped (non-fatal): {e}")
-
-                recording_name = f"block{block_index}_{stream_name}_recording"
-                recording_dict[(session_name, recording_name)] = {}
-                recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
-                recording_dict[(session_name, recording_name)]["raw"] = recording
-                added_any = True
-
-                # load the associated LF stream (if available) only for AP streams
-                if "ap" in stream_name:
-                    stream_name_lf = stream_name.replace("ap", "lf")
-                    try:
-                        recording_lf = se.read_spikeglx(spikeglx_folder, stream_name=stream_name_lf)
-                        recording_dict[(session_name, recording_name)]["lfp"] = recording_lf
-                    except Exception:
-                        logging.info(f"\t\tNo LFP stream found for {stream_name}")
-
-            except Exception as e:
-                logging.info(f"\tFailed to read stream {stream_name}: {e}")
-
-        # Fallback: if nothing was added (e.g., only LF detected), try to read 'nidq' explicitly
-        if not added_any:
-            try:
-                logging.info("\tNo eligible streams added; trying explicit 'nidq' fallback")
-                recording = se.read_spikeglx(spikeglx_folder, stream_name="nidq")
-                try:
-                    if recording.get_num_channels() >= 36:
-                        recording = recording.channel_slice(channel_ids=recording.channel_ids[:32])
-                        logging.info("\tNIDQ fallback: keeping first 32 MN channels (dropping MA)")
+                        logging.info(f"\tNIDQ fallback channel slice skipped (non-fatal): {e}")
+    
+                    recording_name = f"block{block_index}_nidq_recording"
+                    recording_dict[(session_name, recording_name)] = {}
+                    recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
+                    recording_dict[(session_name, recording_name)]["raw"] = recording
+                    added_any = True
                 except Exception as e:
-                    logging.info(f"\tNIDQ fallback channel slice skipped (non-fatal): {e}")
-
-                recording_name = f"block{block_index}_nidq_recording"
-                recording_dict[(session_name, recording_name)] = {}
-                recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
-                recording_dict[(session_name, recording_name)]["raw"] = recording
-                added_any = True
-            except Exception as e:
-                logging.info(f"\tExplicit NIDQ fallback failed: {e}")
+                    logging.info(f"\tExplicit NIDQ fallback failed: {e}")
 
 
     elif INPUT == "openephys":
