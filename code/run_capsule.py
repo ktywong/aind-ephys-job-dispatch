@@ -356,7 +356,7 @@ if __name__ == "__main__":
             logging.info(f"\tSession name: {session_name}")
             logging.info(f"\tNum. streams: {len(stream_names)}")
             for stream_name in stream_names:
-                if "nidq" not in stream_name and "lf" not in stream_name and "SYNC" not in stream_name:
+                if "lf" not in stream_name and "SYNC" not in stream_name:
                     recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
                     recording_name = f"block{block_index}_{stream_name}_recording"
                     recording_dict[(session_name, recording_name)] = {}
