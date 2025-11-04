@@ -356,21 +356,27 @@ if __name__ == "__main__":
             logging.info(f"\tSession name: {session_name}")
             logging.info(f"\tNum. streams: {len(stream_names)}")
             for stream_name in stream_names:
-                if "lf" not in stream_name and "SYNC" not in stream_name:
-                    recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
-                    recording_name = f"block{block_index}_{stream_name}_recording"
-                    recording_dict[(session_name, recording_name)] = {}
-                    recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
-                    recording_dict[(session_name, recording_name)]["raw"] = recording
+                if "lf" in stream_name or "SYNC" in stream_name:
+                    logging.info(f"\tSkipping stream {stream_name} (LF/SYNC)")
+                    continue
 
-                    # load the associated LF stream (if available)
-                    if "ap" in stream_name:
-                        stream_name_lf = stream_name.replace("ap", "lf")
-                        try:
-                            recording_lf = se.read_spikeglx(spikeglx_folder, stream_name=stream_name_lf)
-                            recording_dict[(session_name, recording_name)]["lfp"] = recording_lf
-                        except:
-                            logging.info(f"\t\tNo LFP stream found for {stream_name}")
+                recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
+                if stream_name == "nidq":
+                    # keep only the first 32 MN channels (order in SpikeGLX NIDQ is MN then MA)
+                    recording = recording.channel_slice(channel_ids=recording.channel_ids[:32])
+                recording_name = f"block{block_index}_{stream_name}_recording"
+                recording_dict[(session_name, recording_name)] = {}
+                recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
+                recording_dict[(session_name, recording_name)]["raw"] = recording
+
+                # load the associated LF stream (if available) only for AP streams
+                if "ap" in stream_name:
+                    stream_name_lf = stream_name.replace("ap", "lf")
+                    try:
+                        recording_lf = se.read_spikeglx(spikeglx_folder, stream_name=stream_name_lf)
+                        recording_dict[(session_name, recording_name)]["lfp"] = recording_lf
+                    except:
+                        logging.info(f"\t\tNo LFP stream found for {stream_name}")
 
     elif INPUT == "openephys":
         # get blocks/experiments and streams info
