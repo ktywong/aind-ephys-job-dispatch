@@ -364,11 +364,29 @@ if __name__ == "__main__":
                     continue
     
                 try:
-                    recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
+                    recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)                        
     
                     # OPTIONAL: for NIDQ, keep only MN channels (drop MA) to avoid gain mismatch
                     # Your meta says snsMnMaXaDw=32,4,0,0 → the first 32 saved channels are MN
                     if stream_name == "nidq":
+                        import numpy as np
+                        # YOUR superficial->deep order (indices are saved MN channels 1..32)
+                        order = [13, 10, 12, 14, 2, 15, 32, 4, 6, 8, 9, 11, 5, 3, 26, 24, 30, 28, 31, 29, 16, 17, 18, 1, 25, 19, 27, 21, 20, 22, 23]  # <-- 31 entries; we’ll place any missing at the end
+                        
+                        N = recording.get_num_channels()   # expect 32
+                        saved_nums = np.arange(1, N + 1, dtype=int)  # 1..32 in saved order
+                        rank = {ch: i for i, ch in enumerate(order)}
+                        missing = [ch for ch in saved_nums if ch not in rank]  # e.g., 7 if it’s truly present
+                        start = len(rank)
+                        for k, ch in enumerate(missing):
+                        rank[ch] = start + k  # append missing at the deepest end
+                        
+                        PITCH_UM = 20.0  # change if your probe pitch is different
+                        y = np.array([rank[ch] * PITCH_UM for ch in saved_nums], dtype=float)
+                        x = np.zeros(N, dtype=float)  # linear probe → x=0
+                        rec_locs = np.c_[x, y]
+                        recording.set_channel_locations(rec_locs)
+                        logging.info(f"\tNIDQ: injected locations for {N} channels (pitch={PITCH_UM} µm). Missing: {missing}")
                         try:
                             if recording.get_num_channels() >= 36:
                                 recording = recording.channel_slice(channel_ids=recording.channel_ids[:32])
