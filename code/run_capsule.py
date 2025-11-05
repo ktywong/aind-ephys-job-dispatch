@@ -379,7 +379,7 @@ if __name__ == "__main__":
                         missing = [ch for ch in saved_nums if ch not in rank]  # e.g., 7 if it’s truly present
                         start = len(rank)
                         for k, ch in enumerate(missing):
-                        rank[ch] = start + k  # append missing at the deepest end
+                            rank[ch] = start + k  # append missing at the deepest end
                         
                         PITCH_UM = 20.0  # change if your probe pitch is different
                         y = np.array([rank[ch] * PITCH_UM for ch in saved_nums], dtype=float)
