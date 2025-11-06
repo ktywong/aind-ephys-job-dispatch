@@ -172,56 +172,56 @@ if __name__ == "__main__":
         pass
 
     elif INPUT == "spikeglx":
-    # get blocks/experiments and streams info
-    spikeglx_folders = [p for p in data_folder.iterdir() if p.is_dir()]
-    if len(spikeglx_folders) == 0:
-        raise Exception("No valid SpikeGLX folder found.")
-    elif len(spikeglx_folders) > 1 and not MULTI_SESSION:
-        raise Exception("Multiple SpikeGLX sessions found in the data folder. Please only add one at a time")
-
-    for spikeglx_folder in spikeglx_folders:
-        session_name = spikeglx_folder.name
-        stream_names, stream_ids = se.get_neo_streams("spikeglx", spikeglx_folder)
-
-        # spikeglx has only one block
-        num_blocks = 1
-        block_index = 0
-
-        logging.info(f"\tSession name: {session_name}")
-        logging.info(f"\tNum. streams: {len(stream_names)}")
-
-        for stream_name in stream_names:
-            # skip LF and SYNC streams
-            if "lf" in stream_name or "SYNC" in stream_name:
-                continue
-
-            logging.info(f"\tStream name: {stream_name}")
-            recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
-
-            # attach probe geometry for NIDQ so channel locations exist
-            if stream_name.lower() == "nidq":
-                try:
-                    probegroup = read_probeinterface(PROBE_ABS)
-                    recording = recording.set_probegroup(probegroup)
-                    logging.info(f"\tAttached NIDQ probe from {PROBE_ABS}")
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Failed to read or attach NIDQ probe json at {PROBE_ABS}: {e}"
-                    )
-
-            recording_name = f"block{block_index}_{stream_name}_recording"
-            recording_dict[(session_name, recording_name)] = {}
-            recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
-            recording_dict[(session_name, recording_name)]["raw"] = recording
-
-            # load the associated LF stream (if available) for AP streams only
-            if "ap" in stream_name:
-                stream_name_lf = stream_name.replace("ap", "lf")
-                try:
-                    recording_lf = se.read_spikeglx(spikeglx_folder, stream_name=stream_name_lf)
-                    recording_dict[(session_name, recording_name)]["lfp"] = recording_lf
-                except Exception:
-                    logging.info(f"\t\tNo LFP stream found for {stream_name}")
+        # get blocks/experiments and streams info
+        spikeglx_folders = [p for p in data_folder.iterdir() if p.is_dir()]
+        if len(spikeglx_folders) == 0:
+            raise Exception("No valid SpikeGLX folder found.")
+        elif len(spikeglx_folders) > 1 and not MULTI_SESSION:
+            raise Exception("Multiple SpikeGLX sessions found in the data folder. Please only add one at a time")
+    
+        for spikeglx_folder in spikeglx_folders:
+            session_name = spikeglx_folder.name
+            stream_names, stream_ids = se.get_neo_streams("spikeglx", spikeglx_folder)
+    
+            # spikeglx has only one block
+            num_blocks = 1
+            block_index = 0
+    
+            logging.info(f"\tSession name: {session_name}")
+            logging.info(f"\tNum. streams: {len(stream_names)}")
+    
+            for stream_name in stream_names:
+                # skip LF and SYNC streams
+                if "lf" in stream_name or "SYNC" in stream_name:
+                    continue
+    
+                logging.info(f"\tStream name: {stream_name}")
+                recording = se.read_spikeglx(spikeglx_folder, stream_name=stream_name)
+    
+                # attach probe geometry for NIDQ so channel locations exist
+                if stream_name.lower() == "nidq":
+                    try:
+                        probegroup = read_probeinterface(PROBE_ABS)
+                        recording = recording.set_probegroup(probegroup)
+                        logging.info(f"\tAttached NIDQ probe from {PROBE_ABS}")
+                    except Exception as e:
+                        raise RuntimeError(
+                            f"Failed to read or attach NIDQ probe json at {PROBE_ABS}: {e}"
+                        )
+    
+                recording_name = f"block{block_index}_{stream_name}_recording"
+                recording_dict[(session_name, recording_name)] = {}
+                recording_dict[(session_name, recording_name)]["input_folder"] = spikeglx_folder
+                recording_dict[(session_name, recording_name)]["raw"] = recording
+    
+                # load the associated LF stream (if available) for AP streams only
+                if "ap" in stream_name:
+                    stream_name_lf = stream_name.replace("ap", "lf")
+                    try:
+                        recording_lf = se.read_spikeglx(spikeglx_folder, stream_name=stream_name_lf)
+                        recording_dict[(session_name, recording_name)]["lfp"] = recording_lf
+                    except Exception:
+                        logging.info(f"\t\tNo LFP stream found for {stream_name}")
 
     elif INPUT == "openephys":
         # (unchanged from your version) ...
